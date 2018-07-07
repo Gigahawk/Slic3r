@@ -6,6 +6,7 @@ use warnings;
 use Config;
 use File::Spec;
 
+
 my %prereqs = qw(
     Devel::CheckLib                 0
     Encode                          0
@@ -36,6 +37,7 @@ my %recommends = qw(
 
 my $sudo    = grep { $_ eq '--sudo' } @ARGV;
 my $gui     = grep { $_ eq '--gui' } @ARGV;
+my $notest = grep { $_ eq '--notest' } @ARGV;
 my $xs_only = grep { $_ eq '--xs' }  @ARGV;
 if ($gui) {
     %prereqs = qw(
@@ -152,8 +154,12 @@ EOF
                 system './xs/Build', 'distclean';
             }
         }
+        if ($notest) {
+            print "--notest specified, skipping tests\n";
+            push @cpanm_args, "--notest";
+        }
         my $res = system $cpanm, @cpanm_args, '--reinstall', '--verbose', './xs';
-        if ($res != 0) {
+        if ($res != 0 && !$notest) {
             die "The XS/C++ code failed to compile, aborting\n";
         }
     }
@@ -163,8 +169,14 @@ if (@missing_prereqs) {
     printf "The following prerequisites failed to install: %s\n", join(', ', @missing_prereqs);
     exit 1;
 } elsif (!$gui) {
-    eval "use App::Prove; 1" or die "Failed to load App::Prove";
-    my $res = App::Prove->new->run ? 0 : 1;
+    my $res;
+    if ($notest){
+        print "--notest specified, skipping tests\n";
+        $res = 0
+    } else {
+        eval "use App::Prove; 1" or die "Failed to load App::Prove";
+        $res = App::Prove->new->run ? 0 : 1;
+    }
     if ($res == 0) {
         print "If you also want to use the GUI you can now run `perl Build.PL --gui` to install the required modules.\n";
     } else {
